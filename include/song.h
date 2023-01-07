@@ -175,7 +175,8 @@ void song_restore_channel_states(void);
 // deals with the saved channel state instead.)
 int song_find_last_channel(void);
 
-int song_get_pattern(unsigned int n, song_note_t ** buf);  // return 0 -> error
+int song_get_pattern(int n, song_note_t ** buf);  // return 0 -> error
+int song_get_pattern_offset(int * n, song_note_t ** buf, int * r, int offset);
 uint8_t *song_get_orderlist(void);
 
 int song_pattern_is_empty(int p);
