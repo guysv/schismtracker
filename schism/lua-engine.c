@@ -43,6 +43,8 @@ static int interrupt = 0;
 extern const unsigned char taskqueue_script[];
 extern size_t taskqueue_script_size;
 
+static char *rc_filename = NULL;
+
 void set_lua_print(lua_console_write write_func)
 {
 	console_write = write_func;
@@ -185,6 +187,25 @@ static int lua_current_channel(lua_State *L)
 	return 1;
 }
 
+void lua_rc_load(void)
+{
+	int err;
+	rc_filename = getenv("SCHISM_LUA_RC");
+	if (!rc_filename)
+		rc_filename = dmoz_path_concat(cfg_dir_dotschism, "rc.lua");
+	
+	err = luaL_loadfile(L, rc_filename);
+	if (err != LUA_OK) {
+		if (err != LUA_ERRFILE)
+			log_appendf(5, " %s", lua_tostring(L, -1));
+		lua_settop(L, 0);
+		return;
+	}
+
+	log_appendf(5, " loaded lua user script at %s", rc_filename);
+	do_lua_resume();
+}
+
 void lua_init(void)
 {
 	L = luaL_newstate();
@@ -221,5 +242,6 @@ void lua_init(void)
 
 	log_append(2, 0, "Lua initialised");
 	log_underline(15);
-	log_appendf(5, " foobar baz");
+	lua_rc_load();
+	// log_appendf(5, " loaded user script %s");
 }
