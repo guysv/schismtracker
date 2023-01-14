@@ -66,9 +66,18 @@ static int set_param(lua_State *L)
 	return 0;
 }
 
+static int get_rows(lua_State *L)
+{
+	int pattern = luaL_checkinteger(L, 1);
+
+	lua_pushinteger(L, song_get_pattern(pattern, NULL));
+	return 1;
+}
+
 static const struct luaL_Reg patternlib [] = {
 	{"set_note", set_note},
 	{"set_param", set_param},
+	{"get_rows", get_rows},
 	{NULL, NULL}
 };
 
