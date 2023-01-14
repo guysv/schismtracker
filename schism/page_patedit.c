@@ -40,6 +40,10 @@
 #include "clippy.h"
 #include "disko.h"
 
+#ifdef USE_LUA
+#include "lua-engine.h"
+#endif
+
 /* --------------------------------------------------------------------------------------------------------- */
 
 #define ROW_IS_MAJOR(r) (current_song->row_highlight_major != 0 && (r) % current_song->row_highlight_major == 0)
@@ -4481,6 +4485,9 @@ static void pattern_editor_playback_update(void)
 			current_row = playing_row;
 			pattern_editor_reposition();
 			status.flags |= NEED_UPDATE;
+#ifdef USE_LUA
+			push_lua_playback_update_task(playing_pattern, playing_row);
+#endif
 		} else if (current_pattern == playing_pattern) {
 			status.flags |= NEED_UPDATE;
 		}

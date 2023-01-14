@@ -157,6 +157,33 @@ int push_lua_midi_task(int value, int param)
 	return 0;
 }
 
+int _playback_update_task(lua_State *L) {
+	int pattern = lua_tointeger(L, lua_upvalueindex(1));
+	int row = lua_tointeger(L, lua_upvalueindex(2));
+	lua_getglobal(L, "_on_playback_update");
+	if (lua_isnil(L, 1)) {
+		return 0;
+	}
+	lua_pushinteger(L, pattern);
+	lua_pushinteger(L, row);
+	lua_call(L, 2, 0);
+	return 0;
+}
+
+int push_lua_playback_update_task(int pattern, int row)
+{
+	lua_pushinteger(L, pattern);
+	lua_pushinteger(L, row);
+
+	lua_pushcclosure(L, _playback_update_task, 2);
+
+	lua_getglobal(L, "_push_task");
+	lua_insert(L, 1);
+	lua_call(L, 1, 0);
+
+	return 0;
+}
+
 static int lua_song_start(lua_State *L)
 {
 	song_start();
