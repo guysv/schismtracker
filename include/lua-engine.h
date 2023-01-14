@@ -31,5 +31,6 @@ void continue_lua_eval();
 void lua_init(void);
 
 int push_lua_midi_task(int value, int param);
+int push_lua_playback_update_task(int pattern, int row);
 
 #endif
