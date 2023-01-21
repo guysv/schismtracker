@@ -2983,6 +2983,9 @@ static int pattern_editor_insert_midi(struct key_event *k)
 
 	status.flags |= SONG_NEEDS_SAVE;
 
+	speed = song_get_current_speed();
+	tick = song_get_current_tick();
+
 	if (midi_start_record && !SONG_PLAYING) {
 		switch (midi_start_record) {
 		case 1: /* pattern loop */
@@ -3005,8 +3008,6 @@ static int pattern_editor_insert_midi(struct key_event *k)
 	}
 
 	song_get_pattern_offset(&p, &pattern, &r, offset);
-	speed = song_get_current_speed();
-	tick = song_get_current_tick();
 
 	if (k->midi_note == -1) {
 		/* nada */
