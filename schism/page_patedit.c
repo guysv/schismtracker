@@ -55,6 +55,11 @@
 /* this is actually used by pattern-view.c */
 int show_default_volumes = 0;
 
+#ifdef USE_LUA
+/* allow setting effect from outside the page */
+int keyjazz_next_effect = FX_NONE;
+#endif
+
 /* --------------------------------------------------------------------- */
 /* The (way too many) static variables */
 
@@ -3036,11 +3041,17 @@ static int pattern_editor_insert_midi(struct key_event *k)
 		}
 		midi_last_note[c] = n = k->midi_note;
 
+		cur_note = pattern + 64 * r + (c-1);
+		
+#ifdef USE_LUA
+		if (cur_note->effect == FX_NONE && keyjazz_next_effect != FX_NONE)
+			cur_note->effect = keyjazz_next_effect;
+#endif
+		
 		if (!quantize_next_row) {
-			c = song_keydown(smp, ins, n, v, c);
+			song_keyrecord(smp, ins, n, v, c, cur_note->effect, cur_note->param);
 		}
 
-		cur_note = pattern + 64 * r + (c-1);
 		patedit_record_note(cur_note, c, r, n, 0);
 
 		if (!template_mode) {
@@ -3230,10 +3241,10 @@ static int pattern_editor_insert(struct key_event *k)
 		/* Be quiet when pasting templates.
 		It'd be nice to "play" a template when pasting it (maybe only for ones that are one row high)
 		so as to hear the chords being inserted etc., but that's a little complicated to do. */
-		if (NOTE_IS_NOTE(n) && !(template_mode && writenote))
-			song_keydown(smp, ins, n, vol, current_channel);
-		if (!writenote)
-			break;
+		// if (NOTE_IS_NOTE(n) && !(template_mode && writenote))
+		// 	song_keydown(smp, ins, n, vol, current_channel);
+		// if (!writenote)
+		// 	break;
 
 		/* Never copy the instrument etc. from the mask when inserting control notes or when
 		erasing a note -- but DO write it when inserting a blank note with the space key. */

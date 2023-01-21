@@ -255,11 +255,14 @@ static int keyjazz_channels[128];
 static int song_keydown_ex(int samp, int ins, int note, int vol, int chan, int effect, int param)
 {
 	int ins_mode;
+	int firsttick = 0;
 	int midi_note = note; /* note gets overwritten, possibly NOTE_NONE */
 	song_voice_t *c;
 	song_note_t mc;
 	song_sample_t *s = NULL;
 	song_instrument_t *i = NULL;
+	int porta = (effect == FX_TONEPORTAMENTO
+				|| effect == FX_TONEPORTAVOL);
 
 	if (chan == KEYJAZZ_CHAN_CURRENT) {
 		chan = current_play_channel;
@@ -272,7 +275,6 @@ static int song_keydown_ex(int samp, int ins, int note, int vol, int chan, int e
 	song_lock_audio();
 
 	c = current_song->voices + chan_internal;
-
 	ins_mode = song_is_instrument_mode();
 
 	if (NOTE_IS_NOTE(note)) {
@@ -306,9 +308,10 @@ static int song_keydown_ex(int samp, int ins, int note, int vol, int chan, int e
 
 	c->row_effect = effect;
 	c->row_param = param;
+	c->row_note = note;
 
 	// now do a rough equivalent of csf_instrument_change and csf_note_change
-	if (i)
+	if (i && !porta)
 		csf_check_nna(current_song, chan_internal, ins, note, 0);
 	if (s) {
 		if (c->flags & CHN_ADLIB) {
@@ -366,7 +369,8 @@ static int song_keydown_ex(int samp, int ins, int note, int vol, int chan, int e
 		// csf_note_change copies stuff from c->ptr_sample as long as c->length is zero
 		// and if period != 0 (ie. sample not playing at a stupid rate)
 		c->ptr_sample = s;
-		c->length = 0;
+		if (!porta)
+			c->length = 0;
 		// ... but it doesn't copy the volumes, for somewhat obvious reasons.
 		c->volume = (vol == KEYJAZZ_DEFAULTVOL) ? s->volume : (((unsigned) vol) << 2);
 		c->instrument_volume = s->global_volume;
@@ -384,7 +388,7 @@ static int song_keydown_ex(int samp, int ins, int note, int vol, int chan, int e
 	}
 	if (c->increment < 0)
 		c->increment = -c->increment; // lousy hack
-	csf_note_change(current_song, chan_internal, note, 0, 0, 1);
+	csf_note_change(current_song, chan_internal, note, porta, 0, 1);
 
 	if (!(status.flags & MIDI_LIKE_TRACKER) && i) {
 		/* midi keyjazz shouldn't require a sample */
@@ -410,6 +414,15 @@ static int song_keydown_ex(int samp, int ins, int note, int vol, int chan, int e
 		current_song->flags &= ~SONG_ENDREACHED;
 		current_song->flags |= SONG_PAUSED;
 	}
+
+	if (effect != FX_NONE) {
+		if (effect == FX_OFFSET || effect == FX_TONEPORTAMENTO) {
+			current_song->flags |= (SONG_FIRSTTICK);
+			firsttick = 1;
+			current_song->tick_count = song_get_current_speed();
+		}
+	}
+	csf_process_effects(current_song, firsttick);
 
 	song_unlock_audio();
 

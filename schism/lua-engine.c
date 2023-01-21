@@ -30,6 +30,7 @@
 #include "lua-engine.h"
 
 #include <assert.h>
+#include <stdarg.h>
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -79,7 +80,8 @@ void do_lua_resume() {
 	const char *err;
 
 	lua_sethook(L, multitask_hook, LUA_MASKCOUNT, 1000);
-	switch (lua_resume(L, NULL, 0, &nres)) {
+	n = lua_gettop(L);
+	switch (lua_resume(L, NULL, MAX(n-1, 0), &nres)) {
 	case LUA_YIELD:
 		running = 1;
 		break;
@@ -96,6 +98,7 @@ void do_lua_resume() {
 		lua_resetthread(L);
 		break;
 	}
+	/* not keeping anything on stack */
 	status.flags |= NEED_UPDATE;
 }
 
@@ -121,7 +124,7 @@ void continue_lua_eval() {
 
 	lua_sethook(L, NULL, LUA_MASKCOUNT, 1000);
 	lua_getglobal(L, "_pop_task");
-	lua_call(L, 0, 1);
+	lua_call(L, 0, LUA_MULTRET);
 	if (!lua_isnil(L, 1)) {
 		do_lua_resume();
 	} else {
@@ -129,59 +132,39 @@ void continue_lua_eval() {
 	}
 }
 
-int _midi_task(lua_State *L) {
-	int value = lua_tointeger(L, lua_upvalueindex(1));
-	int param = lua_tointeger(L, lua_upvalueindex(2));
-	lua_getglobal(L, "_on_midi");
-	if (lua_isnil(L, 1)) {
-		return 0;
-	}
-	lua_pushinteger(L, value);
-	lua_pushinteger(L, param);
-	lua_call(L, 2, 0);
-	return 0;
-}
-
-int push_lua_midi_task(int value, int param)
+void push_lua_task_ints(char *cb, int nargs, ...)
 {
+	va_list args;
 
-	lua_pushinteger(L, value);
-	lua_pushinteger(L, param);
+	lua_getglobal(L, cb);
+	if (lua_isnil(L, 1))
+		return;
 
-	lua_pushcclosure(L, _midi_task, 2);
+	va_start(args, nargs);
+
+	for (int i = 0; i < nargs; i++)
+        lua_pushinteger(L, va_arg(args, int));
+	
+	va_end(args);
 
 	lua_getglobal(L, "_push_task");
 	lua_insert(L, 1);
-	lua_call(L, 1, 0);
-
-	return 0;
+	lua_call(L, nargs+1 /* 1 = cb */, 0);
 }
 
-int _playback_update_task(lua_State *L) {
-	int pattern = lua_tointeger(L, lua_upvalueindex(1));
-	int row = lua_tointeger(L, lua_upvalueindex(2));
-	lua_getglobal(L, "_on_playback_update");
-	if (lua_isnil(L, 1)) {
-		return 0;
-	}
-	lua_pushinteger(L, pattern);
-	lua_pushinteger(L, row);
-	lua_call(L, 2, 0);
-	return 0;
-}
-
-int push_lua_playback_update_task(int pattern, int row)
+void push_lua_midi_cc_task(int value, int param)
 {
-	lua_pushinteger(L, pattern);
-	lua_pushinteger(L, row);
+	push_lua_task_ints("_on_midi_cc", 2, value, param);
+}
 
-	lua_pushcclosure(L, _playback_update_task, 2);
+void push_lua_midi_note_task(int note, int velocity)
+{
+	push_lua_task_ints("_on_midi_note", 2, note, velocity);
+}
 
-	lua_getglobal(L, "_push_task");
-	lua_insert(L, 1);
-	lua_call(L, 1, 0);
-
-	return 0;
+void push_lua_playback_update_task(int pattern, int row)
+{
+	push_lua_task_ints("_on_playback_update", 2, pattern, row);
 }
 
 static int lua_song_start(lua_State *L)
@@ -212,6 +195,12 @@ static int lua_current_channel(lua_State *L)
 {
 	lua_pushinteger(L, get_current_channel());
 	return 1;
+}
+
+static int lua_set_current_channel(lua_State *L)
+{
+	set_current_channel(lua_tointeger(L, 1));
+	return 0;
 }
 
 void lua_rc_load(void)
@@ -259,6 +248,9 @@ void lua_init(void)
 
 	lua_pushcfunction(L, lua_current_channel);
 	lua_setglobal(L, "current_channel");
+
+	lua_pushcfunction(L, lua_set_current_channel);
+	lua_setglobal(L, "set_current_channel");
 
 	lua_pushcfunction(L, lua_current_row);
 	lua_setglobal(L, "current_row");
