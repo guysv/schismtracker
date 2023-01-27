@@ -80,15 +80,15 @@ void do_lua_resume(int args) {
 	int n;
 	const char *err;
 
+	status.flags |= NEED_UPDATE;
+
 	lua_sethook(L, multitask_hook, LUA_MASKCOUNT, 1000);
 
 	switch (lua_resume(L, NULL, args, &yield_ret)) {
 	case LUA_YIELD:
-		// running = 1;
-		break;
-	case LUA_OK:
+		return;
 	default:
-		// running = 0;
+	case LUA_OK:
 		lua_resetthread(L);
 		
 		n = lua_gettop(L);
@@ -100,8 +100,6 @@ void do_lua_resume(int args) {
 
 		break;
 	}
-	/* not keeping anything on stack */
-	status.flags |= NEED_UPDATE;
 }
 
 void eval_lua_input(char *input) {
@@ -123,7 +121,7 @@ void continue_lua_eval() {
 		return;
 	}
 
-	lua_sethook(L, NULL, LUA_MASKCOUNT, 1000);
+	lua_sethook(L, NULL, 0, 0);
 	lua_getglobal(L, "_pop_task");
 	lua_call(L, 0, LUA_MULTRET);
 	if (!lua_isnil(L, 1)) {
