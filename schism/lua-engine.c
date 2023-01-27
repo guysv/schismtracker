@@ -38,8 +38,10 @@
 static lua_State *L;
 static lua_console_write console_write = NULL;
 
-static int running = 0;
+// static int running = 0;
+#define running (lua_status(L) == LUA_YIELD)
 static int interrupt = 0;
+static int yield_ret = 0;
 
 extern const unsigned char taskqueue_script[];
 extern size_t taskqueue_script_size;
@@ -71,23 +73,24 @@ static int lua_print_console(lua_State *L) {
 }
 
 static void multitask_hook(lua_State *L, lua_Debug *ar) {
-	lua_yield(L, 0);
+	lua_yield(L, lua_gettop(L));
 }
 
-void do_lua_resume() {
-	int nres;
+void do_lua_resume(int args) {
 	int n;
 	const char *err;
 
 	lua_sethook(L, multitask_hook, LUA_MASKCOUNT, 1000);
-	n = lua_gettop(L);
-	switch (lua_resume(L, NULL, MAX(n-1, 0), &nres)) {
+
+	switch (lua_resume(L, NULL, args, &yield_ret)) {
 	case LUA_YIELD:
-		running = 1;
+		// running = 1;
 		break;
 	case LUA_OK:
 	default:
-		running = 0;
+		// running = 0;
+		lua_resetthread(L);
+		
 		n = lua_gettop(L);
 		if (n > 0) {
 			lua_getglobal(L, "print");
@@ -95,7 +98,6 @@ void do_lua_resume() {
 			lua_call(L, n, 0);
 		}
 
-		lua_resetthread(L);
 		break;
 	}
 	/* not keeping anything on stack */
@@ -110,15 +112,14 @@ void eval_lua_input(char *input) {
 	}
 
 	luaL_loadstring(L, input);
-	
-	do_lua_resume();
+	do_lua_resume(0);
 }
 
 void continue_lua_eval() {
 	int nres;
 
 	if (running) {
-		do_lua_resume();
+		do_lua_resume(yield_ret);
 		return;
 	}
 
@@ -126,7 +127,7 @@ void continue_lua_eval() {
 	lua_getglobal(L, "_pop_task");
 	lua_call(L, 0, LUA_MULTRET);
 	if (!lua_isnil(L, 1)) {
-		do_lua_resume();
+		do_lua_resume(lua_gettop(L)-1);
 	} else {
 		lua_pop(L, 1);
 	}
@@ -135,10 +136,13 @@ void continue_lua_eval() {
 void push_lua_task_ints(char *cb, int nargs, ...)
 {
 	va_list args;
+	lua_getglobal(L, "_push_task");
 
 	lua_getglobal(L, cb);
-	if (lua_isnil(L, 1))
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, -2);
 		return;
+	}
 
 	va_start(args, nargs);
 
@@ -147,8 +151,7 @@ void push_lua_task_ints(char *cb, int nargs, ...)
 	
 	va_end(args);
 
-	lua_getglobal(L, "_push_task");
-	lua_insert(L, 1);
+	lua_sethook(L, NULL, 0, 0);
 	lua_call(L, nargs+1 /* 1 = cb */, 0);
 }
 
@@ -219,7 +222,7 @@ void lua_rc_load(void)
 	}
 
 	log_appendf(5, " loaded lua user script at %s", rc_filename);
-	do_lua_resume();
+	do_lua_resume(0);
 }
 
 void lua_init(void)
@@ -233,6 +236,9 @@ void lua_init(void)
 	luaL_openlibs(L);
 	luaL_requiref(L, "pattern", luaopen_pattern, 1);
 	lua_pop(L, 1);
+
+	lua_getglobal(L, "print");
+	lua_setglobal(L, "_print");
 
 	lua_pushcfunction(L, lua_print_console);
 	lua_setglobal(L, "print");
