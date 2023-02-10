@@ -56,9 +56,15 @@ static SDL_mutex *midi_port_mutex = NULL;
 static SDL_mutex *midi_record_mutex = NULL;
 static SDL_mutex *midi_play_mutex = NULL;
 static SDL_cond *midi_play_cond = NULL;
+static SDL_mutex *midi_tick_mutex = NULL;
+static int midi_tick_count = 0;
 
 static struct midi_provider *port_providers = NULL;
 
+#define TICK_HISTORY_LEN (24 * 16)
+static uint64_t tick_in_history[TICK_HISTORY_LEN] = { 0 };
+static uint64_t tick_in_last = 0;
+static int tick_in_cursor = 0;
 
 /* all this just for usleep?! (maybe we should have sys/win32/usleep.c) */
 #ifdef WIN32
@@ -337,6 +343,29 @@ void midi_engine_poll_ports(void)
 	SDL_mutexV(midi_mutex);
 }
 
+void midi_increment_tick_count(void)
+{
+    SDL_mutexP(midi_tick_mutex);
+    midi_tick_count++;
+    SDL_mutexV(midi_tick_mutex);
+}
+
+void midi_reset_tick_count(void)
+{
+    SDL_mutexP(midi_tick_mutex);
+    midi_tick_count = 0;
+    SDL_mutexV(midi_tick_mutex);
+}
+
+int midi_poll_tick_count(void)
+{
+    SDL_mutexP(midi_tick_mutex);
+    int value = midi_tick_count > 1;
+	if (value) midi_tick_count -= 1;
+    SDL_mutexV(midi_tick_mutex);
+    return value;
+}
+
 int midi_engine_start(void)
 {
 	if (_connected)
@@ -347,14 +376,20 @@ int midi_engine_start(void)
 	midi_play_mutex   = SDL_CreateMutex();
 	midi_port_mutex   = SDL_CreateMutex();
 	midi_play_cond    = SDL_CreateCond();
+	midi_tick_mutex   = SDL_CreateMutex();
 
-	if (!(midi_mutex && midi_record_mutex && midi_play_mutex && midi_port_mutex && midi_play_cond)) {
+	if (!(midi_mutex && midi_record_mutex &&
+		midi_play_mutex && midi_port_mutex &&
+		midi_play_cond && midi_tick_mutex)) {
 		if (midi_mutex)        SDL_DestroyMutex(midi_mutex);
 		if (midi_record_mutex) SDL_DestroyMutex(midi_record_mutex);
 		if (midi_play_mutex)   SDL_DestroyMutex(midi_play_mutex);
 		if (midi_port_mutex)   SDL_DestroyMutex(midi_port_mutex);
 		if (midi_play_cond)    SDL_DestroyCond(midi_play_cond);
-		midi_mutex = midi_record_mutex = midi_play_mutex = midi_port_mutex = NULL;
+		if (midi_tick_mutex)   SDL_DestroyMutex(midi_tick_mutex);
+		
+		midi_mutex = midi_record_mutex = midi_play_mutex =
+			midi_port_mutex = midi_tick_mutex = NULL;
 		midi_play_cond = NULL;
 		return 0;
 	}
@@ -859,8 +894,9 @@ void midi_received_cb(struct midi_port *src, unsigned char *data, unsigned int l
 			if (len <= 2) return;
 			midi_event_sysex(data+1, len-2);
 			break;
-		case 6: /* tick */
+		case 8: /* tick */
 			midi_event_tick();
+			midi_increment_tick_count();
 			break;
 		default:
 			/* something else */
@@ -942,6 +978,39 @@ void midi_event_sysex(const unsigned char *data, unsigned int len)
 	midi_push_event(SCHISM_EVENT_MIDI_SYSEX, packet, packet_len, 0);
 }
 
+int _c = 0;
+
+void handle_midi_tick(void)
+{
+	_c++;
+	int now, intervals = 0, bpm;
+
+	if (!(midi_flags & MIDI_DETECT_CLOCK))
+		return;
+	
+	// printf("foo"); fflush(stdout);
+
+	now = SDL_GetTicks64();
+
+	tick_in_history[tick_in_cursor] = now - tick_in_last;
+	tick_in_last = now;
+	tick_in_cursor++;
+	tick_in_cursor %= TICK_HISTORY_LEN;
+
+	// if (!(_c % 100)) printf("\n");
+
+	for (int i = 1; i < TICK_HISTORY_LEN; i++) {
+		if (!tick_in_history[i])
+			return;
+		
+		intervals += tick_in_history[i];
+		// if (!(_c % 100)) printf("[i: %d, val %d, intervals %d]\n", i, TICK_HISTORY_NEXT(i), intervals);
+	}
+
+	bpm = 60 * 1000 / (intervals / (TICK_HISTORY_LEN));
+	if (!(_c % 10)) printf("[bpm: %d, intervals %d, intervals/len %d]\n", bpm, intervals, intervals / TICK_HISTORY_LEN); fflush(stdout);
+}
+
 int midi_engine_handle_event(void *ev)
 {
 	struct key_event kk = {.is_synthetic = 0};
@@ -1001,7 +1070,8 @@ int midi_engine_handle_event(void *ev)
 			break;
 		case 0xA: /* MIDI start */
 		case 0xB: /* MIDI continue */
-			song_start();
+			song_loop_pattern(get_current_pattern(), get_current_row());;
+			midi_reset_tick_count();
 			break;
 		case 0xC: /* MIDI stop */
 		case 0xF: /* MIDI reset */
@@ -1013,6 +1083,10 @@ int midi_engine_handle_event(void *ev)
 		/* but missing the F0 and the stop byte (F7) */
 		//len = *((unsigned int *)e->user.data1);
 		//sysex = ((char *)e->user.data1)+sizeof(unsigned int);
+		break;
+	
+	case SCHISM_EVENT_MIDI_TICK:
+		// handle_midi_tick();
 		break;
 
 	default:

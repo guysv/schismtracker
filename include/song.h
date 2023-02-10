@@ -274,7 +274,8 @@ void song_start(void);
 void song_start_once(void);
 void song_pause(void);
 void song_stop(void);
-void song_stop_unlocked(int quitting);
+#define song_stop_unlocked(quitting) printf("CATCHME %s:%d\n", __FUNCTION__, __LINE__); fflush(stdout); _song_stop_unlocked(quitting)
+void _song_stop_unlocked(int quitting);
 void song_loop_pattern(int pattern, int row);
 void song_start_at_order(int order, int row);
 void song_start_at_pattern(int pattern, int row);

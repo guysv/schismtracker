@@ -136,8 +136,8 @@ static void audio_callback(UNUSED void *qq, uint8_t * stream, int len)
 	if (current_song->flags & SONG_ENDREACHED) {
 		n = 0;
 	} else {
-		n = csf_read(current_song, stream, len);
-		if (!n) {
+		int res = csf_read_ex(current_song, stream, len, &n);
+		if (!res) { // no more
 			if (status.current_page == PAGE_WATERFALL
 			|| status.vis_style == VIS_FFT) {
 				vis_work_8m(NULL, 0);
@@ -556,7 +556,8 @@ void song_stop(void)
 }
 
 /* for midi translation */
-static int note_tracker[64];
+#define NOTE_TRACKER_HISTLEN 16
+static int note_tracker[64][NOTE_TRACKER_HISTLEN];
 static int vol_tracker[64];
 static int ins_tracker[64];
 static int was_program[16];
@@ -566,7 +567,7 @@ static int was_bankhi[16];
 static const song_note_t *last_row[64];
 static int last_row_number = -1;
 
-void song_stop_unlocked(int quitting)
+void _song_stop_unlocked(int quitting)
 {
 	if (!current_song) return;
 
@@ -575,14 +576,19 @@ void song_stop_unlocked(int quitting)
 
 		/* shut off everything; not IT like, but less annoying */
 		for (int chan = 0; chan < 64; chan++) {
-			if (note_tracker[chan] != 0) {
+			for (int i = 0; i < NOTE_TRACKER_HISTLEN; i++) {
+				if (note_tracker[chan][i] == 0)
+					continue;
+
 				for (int j = 0; j < 16; j++) {
 					csf_process_midi_macro(current_song, chan,
 						current_song->midi_config.note_off,
-						0, note_tracker[chan], 0, j);
+						0, note_tracker[chan][i], 0, j);
 				}
 				moff[0] = 0x80 + chan;
-				moff[1] = note_tracker[chan];
+				moff[1] = note_tracker[chan][i];
+				printf("cleaning %d:%d:%d\n", chan, i, note_tracker[chan][i]); fflush(stdout);
+				
 				csf_midi_send(current_song, (unsigned char *) moff, 2, 0, 0);
 			}
 		}
@@ -1132,12 +1138,16 @@ printf("channel = %d note=%d starting_note=%p\n",chan,m_note,starting_note);
 
 	need_note = need_velocity = -1;
 	if (m_note > 120) {
-		if (note_tracker[chan] != 0) {
+		for (int i = 0; i < NOTE_TRACKER_HISTLEN; i++) {
+			if (note_tracker[chan][i] == 0)
+				continue;
+
 			csf_process_midi_macro(current_song, chan, current_song->midi_config.note_off,
-				0, note_tracker[chan], 0, ins_tracker[chan]);
+				0, note_tracker[chan][i], 0, ins_tracker[chan]);
+
+			note_tracker[chan][i] = 0;
 		}
 
-		note_tracker[chan] = 0;
 		if (m->voleffect != VOLFX_VOLUME) {
 			vol_tracker[chan] = 64;
 		} else {
@@ -1148,18 +1158,37 @@ printf("channel = %d note=%d starting_note=%p\n",chan,m_note,starting_note);
 		need_velocity = vol_tracker[chan];
 
 	} else if (m->note) {
-		if (note_tracker[chan] != 0) {
-			csf_process_midi_macro(current_song, chan, current_song->midi_config.note_off,
-				0, note_tracker[chan], 0, ins_tracker[chan]);
+		for (int i = 0; i < NOTE_TRACKER_HISTLEN; i++) {
+			if (note_tracker[chan][i] != 0 &&
+				m->effect != FX_TONEPORTAMENTO &&
+				m->voleffect != VOLFX_TONEPORTAMENTO) {
+				
+				csf_process_midi_macro(current_song, chan, current_song->midi_config.note_off,
+					0, note_tracker[chan][i], 0, ins_tracker[chan]);
+				
+				note_tracker[chan][i] = 0;
+			}
 		}
-		note_tracker[chan] = m_note;
+
 		if (m->voleffect != VOLFX_VOLUME) {
 			vol_tracker[chan] = 64;
 		} else {
 			vol_tracker[chan] = m->volparam;
 		}
-		need_note = note_tracker[chan];
 		need_velocity = vol_tracker[chan];
+
+
+		// find next note_tracker slot
+		need_note = 0;
+		if (mc) { // track notes only for midi output notes
+			for (int i = 0; i < NOTE_TRACKER_HISTLEN; i++) {
+				if (note_tracker[chan][i] == 0) {
+					note_tracker[chan][i] = m_note;
+					need_note = note_tracker[chan][i];
+					break;
+				}
+			}
+		}
 	}
 
 	if (m->instrument > 0) {
@@ -1197,12 +1226,12 @@ printf("channel = %d note=%d starting_note=%p\n",chan,m_note,starting_note);
 		need_velocity = CLAMP(need_velocity*2,0,127);
 		csf_process_midi_macro(current_song, chan, current_song->midi_config.note_on,
 			0, need_note, need_velocity, ins); // noteon
-	} else if (need_velocity > -1 && note_tracker[chan] > 0) {
-		need_velocity = CLAMP(need_velocity*2,0,127);
-		csf_process_midi_macro(current_song, chan, current_song->midi_config.set_volume,
-			need_velocity, note_tracker[chan], need_velocity, ins); // volume-set
 	}
-
+	// } else if (need_velocity > -1 && note_tracker[chan] > 0) {
+	// 	need_velocity = CLAMP(need_velocity*2,0,127);
+	// 	csf_process_midi_macro(current_song, chan, current_song->midi_config.set_volume,
+	// 		need_velocity, note_tracker[chan], need_velocity, ins); // volume-set
+	// }
 }
 static void _schism_midi_out_raw(const unsigned char *data, unsigned int len, unsigned int pos)
 {

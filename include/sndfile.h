@@ -659,6 +659,9 @@ int csf_set_resampling_mode(song_t *csf, uint32_t mode); // SRCMODE_XXXX
 
 // sndmix
 unsigned int csf_read(song_t *csf, void *v_buffer, unsigned int bufsize);
+// csf_read_ex return values
+#define CSF_READ_MIDI_BACKOFF (-1)
+int csf_read_ex(song_t *csf, void * v_buffer, unsigned int bufsize, unsigned int *read);
 int csf_process_tick(song_t *csf);
 int csf_read_note(song_t *csf);
 

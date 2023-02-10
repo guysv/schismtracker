@@ -157,7 +157,12 @@ int macosx_midi_setup(void);    // MACOSX
 #define MIDI_CUT_NOTE_OFF       0x00000020
 #define MIDI_PITCHBEND          0x00000040
 #define MIDI_DISABLE_RECORD     0x00010000
+#define MIDI_DETECT_CLOCK       0x00020000
 
 extern int midi_flags, midi_pitch_depth, midi_amplification, midi_c5note;
+
+void midi_increment_tick_count(void);
+void midi_reset_tick_count(void);
+int midi_poll_tick_count(void);
 
 #endif

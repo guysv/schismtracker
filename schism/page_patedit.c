@@ -3000,6 +3000,7 @@ static int pattern_editor_insert_midi(struct key_event *k)
 			break;
 		};
 	} else if (midi_flags & MIDI_TICK_QUANTIZE && SONG_PLAYING
+			&& midi_start_record /* do not quantize if not recording */
 			&& tick + 1 < speed / 2) {
 		/* correct late notes to the next row */
 		/* tick + 1 because processing the keydown itself takes another tick */

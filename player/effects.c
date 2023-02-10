@@ -756,6 +756,10 @@ static void fx_special(song_t *csf, uint32_t nchan, uint32_t param)
 // Send exactly one MIDI message
 void csf_midi_send(song_t *csf, const unsigned char *data, unsigned int len, uint32_t nchan, int fake)
 {
+	// if (len >= 3) {
+	// 	printf("%.2x %.2x %.2x\n", data[0], data[1], data[2]); fflush(stdout);
+	// }
+	
 	song_voice_t *chan = &csf->voices[nchan];
 
 	if (len >= 1 && (data[0] == 0xFA || data[0] == 0xFC || data[0] == 0xFF)) {

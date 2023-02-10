@@ -112,7 +112,7 @@ About the controllers... In AWE32 they are:
        - http://www.philrees.co.uk/nrpnq.htm
 */
 
-//#define GM_DEBUG
+// #define GM_DEBUG
 
 static unsigned RunningStatus = 0;
 #ifdef GM_DEBUG

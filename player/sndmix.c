@@ -29,6 +29,7 @@
 #include "it.h"
 
 #include "util.h" /* for clamp */
+#include "midi.h"
 
 // Volume ramp length, in 1/10 ms
 #define VOLUMERAMPLEN   146 // 1.46ms = 64 samples at 44.1kHz
@@ -711,14 +712,25 @@ int csf_init_player(song_t *csf, int reset)
 	return 1;
 }
 
-
 unsigned int csf_read(song_t *csf, void * v_buffer, unsigned int bufsize)
+{
+	unsigned int n;
+	csf_read_ex(csf, v_buffer, bufsize, &n);
+	return n;
+}
+
+int csf_read_ex(song_t *csf, void * v_buffer, unsigned int bufsize, unsigned int *read)
 {
 	uint8_t * buffer = (uint8_t *)v_buffer;
 	convert_t convert_func = clip_32_to_8;
 	int32_t vu_min[2];
 	int32_t vu_max[2];
+	int midi_poll_res = 0;
 	unsigned int bufleft, max, sample_size, count, smpcount, mix_stat=0;
+	unsigned int unused_read;
+
+	read = read == NULL ? unused_read : read;
+	*read = 0;
 
 	vu_min[0] = vu_min[1] = 0x7FFFFFFF;
 	vu_max[0] = vu_max[1] = -0x7FFFFFFF;
@@ -744,12 +756,12 @@ unsigned int csf_read(song_t *csf, void * v_buffer, unsigned int bufsize)
 
 	while (bufleft > 0) {
 		// Update Channel Data
-
 		if (!csf->buffer_count) {
 			if (!(csf->mix_flags & SNDMIX_DIRECTTODISK))
 				csf->buffer_count = bufleft;
-
-			if (!csf_read_note(csf)) {
+			midi_poll_res = midi_poll_tick_count();
+			if (!midi_poll_res) {}
+			else if (!csf_read_note(csf)) {
 				csf->flags |= SONG_ENDREACHED;
 
 				if (csf->stop_at_order > -1)
@@ -851,6 +863,11 @@ unsigned int csf_read(song_t *csf, void * v_buffer, unsigned int bufsize)
 		csf->mix_stat += mix_stat - 1;
 		csf->mix_stat /= mix_stat;
 	}
+
+	*read = max - bufleft;
+
+	if (!midi_poll_res)
+		return CSF_READ_MIDI_BACKOFF;
 
 	return max - bufleft;
 }
@@ -1022,7 +1039,7 @@ int csf_process_tick(song_t *csf)
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Handles envelopes & mixer setup
-
+int foo = 0;
 int csf_read_note(song_t *csf)
 {
 	song_voice_t *chan;
