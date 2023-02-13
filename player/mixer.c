@@ -1549,7 +1549,7 @@ unsigned int csf_create_stereo_mix(song_t *csf, int count)
 		nchmixed += naddmix;
 	}
 
-	// GM_IncrementSongCounter(count);
+	GM_IncrementSongCounter(count);
 
 	if (csf->multi_write) {
 		/* mix all adlib onto track one */
