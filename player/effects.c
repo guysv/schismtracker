@@ -823,6 +823,36 @@ static uint8_t midi_event_length(uint8_t first_byte)
 	}
 }
 
+void DumpHex(const void* data, size_t size) {
+	char ascii[17];
+	size_t i, j;
+	ascii[16] = '\0';
+	for (i = 0; i < size; ++i) {
+		printf("%02X ", ((unsigned char*)data)[i]);
+		if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+			ascii[i % 16] = ((unsigned char*)data)[i];
+		} else {
+			ascii[i % 16] = '.';
+		}
+		if ((i+1) % 8 == 0 || i+1 == size) {
+			printf(" ");
+			if ((i+1) % 16 == 0) {
+				printf("|  %s \n", ascii);
+			} else if (i+1 == size) {
+				ascii[(i+1) % 16] = '\0';
+				if ((i+1) % 16 <= 8) {
+					printf(" ");
+				}
+				for (j = (i+1) % 16; j < 16; ++j) {
+					printf("   ");
+				}
+				printf("|  %s \n", ascii);
+			}
+		}
+	}
+	fflush(stdout);
+}
+
 void csf_process_midi_macro(song_t *csf, uint32_t nchan, const char * macro, uint32_t param,
 			uint32_t note, uint32_t velocity, uint32_t use_instr)
 {
@@ -983,6 +1013,7 @@ void csf_process_midi_macro(song_t *csf, uint32_t nchan, const char * macro, uin
 		if (outbuffer[send_pos] < 0xF0) {
 			running_status = outbuffer[send_pos];
 		}
+		DumpHex(outbuffer + send_pos, send_length);
 		csf_midi_send(csf, outbuffer + send_pos, send_length, nchan, saw_c && fake_midi_channel);
 		send_pos += send_length;
 	}

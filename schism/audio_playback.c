@@ -562,15 +562,15 @@ void song_stop_unlocked(int quitting)
 
 		/* shut off everything; not IT like, but less annoying */
 		for (int chan = 0; chan < 64; chan++) {
-			if (note_tracker[chan] != 0) {
-				for (int j = 0; j < 16; j++) {
+			if (note_tracker[chan] != 0 && ins_tracker[chan] != 0) {
+				// for (int j = 0; j < 16; j++) {
 					csf_process_midi_macro(current_song, chan,
 						current_song->midi_config.note_off,
-						0, note_tracker[chan], 0, j);
-				}
-				moff[0] = 0x80 + chan;
-				moff[1] = note_tracker[chan];
-				csf_midi_send(current_song, (unsigned char *) moff, 2, 0, 0);
+						0, note_tracker[chan], 0, ins_tracker[chan]);
+				// }
+				// moff[0] = 0x80 + chan;
+				// moff[1] = note_tracker[chan];
+				// csf_midi_send(current_song, (unsigned char *) moff, 2, 0, 0);
 			}
 		}
 		for (int j = 0; j < 16; j++) {
