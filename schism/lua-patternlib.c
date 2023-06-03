@@ -66,6 +66,17 @@ static int set_param(lua_State *L)
 	return 0;
 }
 
+static int set_instrument(lua_State *L)
+{
+	int pattern = luaL_checkinteger(L, 1);
+	int channel = luaL_checkinteger(L, 2);
+	int row = luaL_checkinteger(L, 3);
+	int instrument = luaL_checkinteger(L, 4);
+
+	_get_note_at(L, pattern, channel, row)->instrument = instrument;
+	return 0;
+}
+
 static int get_rows(lua_State *L)
 {
 	int pattern = luaL_checkinteger(L, 1);
@@ -77,6 +88,7 @@ static int get_rows(lua_State *L)
 static const struct luaL_Reg patternlib [] = {
 	{"set_note", set_note},
 	{"set_param", set_param},
+	{"set_instrument", set_instrument},
 	{"get_rows", get_rows},
 	{NULL, NULL}
 };
