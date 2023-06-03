@@ -3035,9 +3035,8 @@ static int pattern_editor_insert_midi(struct key_event *k)
 		}
 		n = k->midi_note;
 
-		if (!quantize_next_row) {
-			c = song_keydown(smp, ins, n, v, c);
-		}
+		// playing in 0 volume will keep keyjazz note tracking state intact
+		c = song_keydown(smp, ins, n, quantize_next_row ? 0 : v, c);
 
 		cur_note = pattern + 64 * r + (c-1);
 		patedit_record_note(cur_note, c, r, n, 0);
