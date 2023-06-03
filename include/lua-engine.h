@@ -30,7 +30,8 @@ void eval_lua_input(char *input);
 void continue_lua_eval();
 void lua_init(void);
 
-int push_lua_midi_task(int value, int param);
-int push_lua_playback_update_task(int pattern, int row);
+void push_lua_midi_cc_task(int value, int param);
+void push_lua_midi_note_task(int note, int velocity);
+void push_lua_playback_update_task(int pattern, int row);
 
 #endif

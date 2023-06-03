@@ -975,6 +975,10 @@ int midi_engine_handle_event(void *ev)
 		else
 			kk.midi_volume = 128;
 		kk.midi_volume = (kk.midi_volume * midi_amplification) / 100;
+#ifdef USE_LUA
+		push_lua_midi_note_task(kk.midi_note, kk.state == KEY_RELEASE ? 0 : kk.midi_volume);
+		continue_lua_eval();
+#endif
 		handle_key(&kk);
 		break;
 	case SCHISM_EVENT_MIDI_PITCHBEND:
@@ -988,7 +992,7 @@ int midi_engine_handle_event(void *ev)
 	case SCHISM_EVENT_MIDI_CONTROLLER:
 		/* controller events */
 #ifdef USE_LUA
-		push_lua_midi_task(st[0], st[2]);
+		push_lua_midi_cc_task(st[0], st[2]);
 #endif
 		break;
 	case SCHISM_EVENT_MIDI_SYSTEM:
