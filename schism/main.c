@@ -41,6 +41,10 @@
 #include "dmoz.h"
 #include "charset.h"
 
+#ifdef USE_LUA
+#include "lua-engine.h"
+#endif
+
 #include "osdefs.h"
 
 #include <errno.h>
@@ -1022,6 +1026,8 @@ static void event_loop(void)
 			while (!(status.flags & NEED_UPDATE) && dmoz_worker() && !SDL_PollEvent(NULL))
 				/* nothing */;
 		}
+
+		continue_lua_eval();
 	}
 	schism_exit(0);
 }
@@ -1143,6 +1149,11 @@ int main(int argc, char **argv)
 	log_nl();
 	audio_init(audio_driver);
 	song_init_modplug();
+
+#ifdef USE_LUA
+	log_nl();
+	lua_init();
+#endif
 
 #ifndef WIN32
 	signal(SIGINT, exit);

@@ -252,7 +252,7 @@ int song_get_pattern_offset(int * n, song_note_t ** buf, int * row, int offset)
 
 // returns length of the pattern, or 0 on error. (this can be used to
 // get a pattern's length by passing NULL for buf.)
-int song_get_pattern(int n, song_note_t ** buf)
+int song_get_pattern(unsigned int n, song_note_t ** buf)
 {
 	if (n >= MAX_PATTERNS)
 		return 0;
