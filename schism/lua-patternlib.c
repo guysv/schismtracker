@@ -55,6 +55,17 @@ static int set_note(lua_State *L)
 	return 0;
 }
 
+static int set_effect(lua_State *L)
+{
+	int pattern = luaL_checkinteger(L, 1);
+	int channel = luaL_checkinteger(L, 2);
+	int row = luaL_checkinteger(L, 3);
+	int effect = luaL_checkinteger(L, 4);
+
+	_get_note_at(L, pattern, channel, row)->effect = effect;
+	return 0;
+}
+
 static int set_param(lua_State *L)
 {
 	int pattern = luaL_checkinteger(L, 1);
@@ -63,6 +74,28 @@ static int set_param(lua_State *L)
 	int param = luaL_checkinteger(L, 4);
 
 	_get_note_at(L, pattern, channel, row)->param = param;
+	return 0;
+}
+
+static int set_voleffect(lua_State *L)
+{
+	int pattern = luaL_checkinteger(L, 1);
+	int channel = luaL_checkinteger(L, 2);
+	int row = luaL_checkinteger(L, 3);
+	int voleffect = luaL_checkinteger(L, 4);
+
+	_get_note_at(L, pattern, channel, row)->voleffect = voleffect;
+	return 0;
+}
+
+static int set_volparam(lua_State *L)
+{
+	int pattern = luaL_checkinteger(L, 1);
+	int channel = luaL_checkinteger(L, 2);
+	int row = luaL_checkinteger(L, 3);
+	int volparam = luaL_checkinteger(L, 4);
+
+	_get_note_at(L, pattern, channel, row)->volparam = volparam;
 	return 0;
 }
 
@@ -87,7 +120,10 @@ static int get_rows(lua_State *L)
 
 static const struct luaL_Reg patternlib [] = {
 	{"set_note", set_note},
+	{"set_effect", set_effect},
 	{"set_param", set_param},
+	{"set_voleffect", set_voleffect},
+	{"set_volparam", set_volparam},
 	{"set_instrument", set_instrument},
 	{"get_rows", get_rows},
 	{NULL, NULL}
